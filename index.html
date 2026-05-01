@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MBTI Friends Universe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0f1a; --bg-secondary: #111827; --fg: #f0f4f8; --muted: #94a3b8; /* Adjusted for better contrast */
+      --accent: #10b981; --accent-secondary: #f59e0b; --card: #1e293b; --border: #334155;
+      --danger: #ef4444; --warning: #f59e0b;
+    }
+    .light-theme {
+      --bg: #f8fafc; --bg-secondary: #f1f5f9; --fg: #0f172a; --muted: #475569; /* Darker gray for readability */
+      --accent: #059669; --accent-secondary: #d97706; --card: #ffffff; --border: #e2e8f0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans Thai', sans-serif; background: var(--bg); color: var(--fg); min-height: 100vh; transition: background 0.5s ease, color 0.5s ease; overflow-x: hidden; }
+    .display-font { font-family: 'Space Grotesk', sans-serif; }
+    
+    #particle-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+    
+    .glass-card { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(10px); transition: all 0.3s ease; }
+    .glass-card:hover { transform: translateY(-2px); box-shadow: 0 20px 40px rgba(16, 185, 129, 0.1); }
+
+    .mbti-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; }
+    
+    .tab-btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.3s ease; background: transparent; color: var(--muted); border: 2px solid transparent; cursor: pointer; }
+    .tab-btn:hover { color: var(--fg); background: var(--card); }
+    .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    .fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .slide-panel { position: fixed; top: 0; right: 0; width: 100%; max-width: 480px; height: 100%; background: var(--card); border-left: 1px solid var(--border); z-index: 100; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.2); }
+    .slide-panel.open { transform: translateX(0); }
+    .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+    .panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .progress-bar { position: relative; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+    .theme-toggle { position: relative; width: 60px; height: 30px; background: var(--card); border: 2px solid var(--border); border-radius: 15px; cursor: pointer; transition: all 0.3s ease; }
+    .theme-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: var(--accent); border-radius: 50%; transition: all 0.3s ease; }
+    .light-theme .theme-toggle::after { left: calc(100% - 24px); background: var(--accent-secondary); }
+
+    .function-card { background: var(--bg-secondary); padding: 0.75rem; border-radius: 0.5rem; border-left: 4px solid var(--border); transition: transform 0.2s; }
+    
+    .dynamics-bar { height: 30px; background: var(--border); border-radius: 8px; position: relative; overflow: hidden; display: flex; }
+    .dynamics-segment { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: white; transition: width 1s ease; }
+
+    .game-choice-btn { background: var(--bg-secondary); border: 2px solid var(--border); transition: all 0.2s; cursor: pointer; }
+    .game-choice-btn:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .team-box { background: var(--bg-secondary); border: 1px solid var(--border); }
+
+    /* Footer Styles */
+    footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.875rem; border-top: 1px solid var(--border); margin-top: 3rem; background: var(--bg); }
+    footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+  </style>
+</head>
+<body>
+  <canvas id="particle-canvas"></canvas>
+  <div id="panel-overlay" class="panel-overlay"></div>
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 glass-card border-b border-[var(--border)]">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <h1 class="text-xl md:text-2xl font-bold"><span class="text-[var(--accent)]">MBTI</span> <span class="text-[var(--fg)]">Universe</span></h1>
+      <div class="flex items-center gap-4">
+        <!-- Fixed Text Visibility -->
+        <span class="text-xs md:text-sm text-[var(--muted)] hidden sm:block font-medium">Based on 16Personalities</span>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative z-10 pt-24 pb-12 px-4">
+    <!-- Hero -->
+    <section class="max-w-7xl mx-auto mb-12 text-center">
+      <h2 class="display-font text-4xl md:text-6xl font-bold mb-4 fade-in">วิเคราะห์<span class="text-[var(--accent)]">บุคลิก</span>เพื่อน</h2>
+      <p class="text-[var(--muted)] text-lg md:text-xl max-w-2xl mx-auto fade-in">19 คน 10 ประเภท รู้ใจ รู้ใจ เข้าใจกัน</p>
+    </section>
+
+    <!-- Tabs -->
+    <nav class="max-w-7xl mx-auto mb-8 flex flex-wrap justify-center gap-2 px-4">
+      <button class="tab-btn active" data-tab="table">ตารางวิเคราะห์</button>
+      <button class="tab-btn" data-tab="dynamics">ภาพรวมกลุ่ม</button>
+      <button class="tab-btn" data-tab="compatibility">ความเข้ากัน</button>
+      <button class="tab-btn" data-tab="radar">กราฟ 4 มิติ</button>
+      <button class="tab-btn" data-tab="games">Fun & Games</button>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4">
+      
+      <!-- 1. Table Tab -->
+      <section id="tab-table" class="tab-content">
+        <div class="glass-card rounded-2xl overflow-hidden">
+          <div class="p-4 md:p-6 border-b border-[var(--border)]"><h3 class="text-xl font-bold">ตารางวิเคราะห์ MBTI</h3></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[600px]">
+              <thead class="bg-[var(--bg-secondary)]">
+                <tr>
+                  <th class="px-4 py-3 text-left">MBTI</th><th class="px-4 py-3 text-left">ชื่อ</th><th class="px-4 py-3 text-left">บุคลิก</th>
+                  <th class="px-4 py-3 text-center hidden md:table-cell">คนดังที่ใกล้เคียง</th>
+                </tr>
+              </thead>
+              <tbody id="mbti-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Group Dynamics Tab -->
+      <section id="tab-dynamics" class="tab-content hidden">
+        <div class="glass-card rounded-2xl p-6">
+          <h3 class="text-xl font-bold mb-6">Group Dynamics Dashboard</h3>
+          <p class="text-[var(--muted)] mb-8">วิเคราะห์ภาพรวมบุคลิกของทุกคนในกลุ่ม</p>
+          <div class="grid gap-8">
+             <div>
+              <div class="flex justify-between mb-2"><span class="font-bold">Extraversion (E)</span><span class="font-bold">Introversion (I)</span></div>
+              <div class="dynamics-bar"><div id="dyn-e" class="dynamics-segment bg-[var(--accent)]"></div><div id="dyn-i" class="dynamics-segment bg-[var(--accent-secondary)]"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-2"><span class="font-bold">Sensing (S)</span><span class="font-bold">Intuition (N)</span></div>
+              <div class="dynamics-bar"><div id="dyn-s" class="dynamics-segment bg-[#3b82f6]"></div><div id="dyn-n" class="dynamics-segment bg-[#ec4899]"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-2"><span class="font-bold">Thinking (T)</span><span class="font-bold">Feeling (F)</span></div>
+              <div class="dynamics-bar"><div id="dyn-t" class="dynamics-segment bg-[#6366f1]"></div><div id="dyn-f" class="dynamics-segment bg-[#f43f5e]"></div></div>
+            </div>
+             <div>
+              <div class="flex justify-between mb-2"><span class="font-bold">Judging (J)</span><span class="font-bold">Perceiving (P)</span></div>
+              <div class="dynamics-bar"><div id="dyn-j" class="dynamics-segment bg-[#0ea5e9]"></div><div id="dyn-p" class="dynamics-segment bg-[#84cc16]"></div></div>
+            </div>
+          </div>
+          <div class="mt-10 bg-[var(--bg-secondary)] rounded-xl p-4">
+            <h4 class="font-bold mb-2">สรุปภาพรวมกลุ่ม</h4>
+            <p id="group-summary" class="text-sm text-[var(--muted)]"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Compatibility Tab -->
+      <section id="tab-compatibility" class="tab-content hidden">
+        <div class="glass-card rounded-2xl p-4 md:p-6">
+          <h3 class="text-xl font-bold mb-6">วิเคราะห์ความเข้ากัน</h3>
+          <div class="grid md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="block text-sm text-[var(--muted)] mb-2">เลือกคนที่ 1:</label>
+              <select id="compat-select-1" class="w-full p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--fg)] focus:outline-none"><option value="">-- เลือก --</option></select>
+            </div>
+            <div>
+              <label class="block text-sm text-[var(--muted)] mb-2">เลือกคนที่ 2:</label>
+              <select id="compat-select-2" class="w-full p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--fg)] focus:outline-none"><option value="">-- เลือก --</option></select>
+            </div>
+          </div>
+          <div id="compat-placeholder" class="text-center py-10 text-[var(--muted)]">เลือกบุคคล 2 คนเพื่อเริ่มวิเคราะห์</div>
+          <div id="compat-result" class="hidden fade-in">
+            <div class="text-center py-6 border-t border-b border-[var(--border)] mb-6">
+              <div class="text-xs uppercase tracking-widest text-[var(--muted)] mb-1" id="compat-type">Relationship Type</div>
+              <div class="text-7xl font-bold display-font" id="compat-score">0%</div>
+              <div class="text-sm text-[var(--muted)] mt-1">Compatibility Score</div>
+            </div>
+            <div class="space-y-4">
+                <div class="bg-[var(--bg-secondary)] rounded-xl p-4 border-l-4 border-[var(--accent)]">
+                    <h4 class="font-bold mb-2 text-[var(--accent)]">จุดแข็งของความสัมพันธ์</h4>
+                    <p id="compat-pros" class="text-sm text-[var(--muted)]"></p>
+                </div>
+                <div class="bg-[var(--bg-secondary)] rounded-xl p-4 border-l-4 border-[var(--warning)]">
+                    <h4 class="font-bold mb-2 text-[var(--warning)]">จุดที่ต้องระวัง</h4>
+                    <p id="compat-cons" class="text-sm text-[var(--muted)]"></p>
+                </div>
+                <div class="bg-[var(--bg-secondary)] rounded-xl p-4 border-l-4 border-[var(--fg)]">
+                    <h4 class="font-bold mb-2">คำแนะนำ</h4>
+                    <p id="compat-advice" class="text-sm text-[var(--muted)]"></p>
+                </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Radar Tab -->
+      <section id="tab-radar" class="tab-content hidden">
+        <div class="glass-card rounded-2xl p-4 md:p-6">
+          <h3 class="text-xl font-bold mb-6">กราฟเรดาร์ 4 มิติ</h3>
+          <div class="mb-6">
+            <label class="block text-sm text-[var(--muted)] mb-2">เลือกบุคคลเพื่อเปรียบเทียบ (สูงสุด 3 คน):</label>
+            <div class="flex flex-wrap gap-2" id="person-selector"></div>
+          </div>
+          <div class="flex flex-col lg:flex-row gap-6 mb-8">
+            <div class="flex-1 flex justify-center"><canvas id="radar-canvas" width="400" height="400"></canvas></div>
+            <div class="flex-1"><h4 class="font-bold mb-4">ค่าพลัง 4 มิติ</h4><div id="dimension-bars" class="space-y-4"></div></div>
+          </div>
+          <div class="border-t border-[var(--border)] pt-6 mt-6">
+            <h4 class="font-bold mb-4 text-lg">คำอธิบาย 4 มิติ MBTI</h4>
+            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                <div class="bg-[var(--bg-secondary)] rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2"><span class="font-bold text-[var(--accent)]">Extraversion (E)</span><span class="text-[var(--muted)]">vs</span><span class="font-bold text-[var(--accent-secondary)]">Introversion (I)</span></div>
+                    <p class="text-[var(--muted)]"><strong>แหล่งพลัง:</strong> กลุ่ม E ได้พลังจากการเข้าสังคม ส่วนกลุ่ม I ได้พลังจากการอยู่คนเดียวและสันโดษ</p>
+                </div>
+                <div class="bg-[var(--bg-secondary)] rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2"><span class="font-bold text-[#3b82f6]">Sensing (S)</span><span class="text-[var(--muted)]">vs</span><span class="font-bold text-[#ec4899]">Intuition (N)</span></div>
+                    <p class="text-[var(--muted)]"><strong>การรับข้อมูล:</strong> กลุ่ม S เชื่อข้อเท็จจริงและรายละเอียด กลุ่ม N สนใจภาพรวมและความเป็นไปได้</p>
+                </div>
+                <div class="bg-[var(--bg-secondary)] rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2"><span class="font-bold text-[#6366f1]">Thinking (T)</span><span class="text-[var(--muted)]">vs</span><span class="font-bold text-[#f43f5e]">Feeling (F)</span></div>
+                    <p class="text-[var(--muted)]"><strong>การตัดสินใจ:</strong> กลุ่ม T ใช้ตรรกะและเหตุผล กลุ่ม F ใช้ค่านิยมและความรู้สึก</p>
+                </div>
+                <div class="bg-[var(--bg-secondary)] rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2"><span class="font-bold text-[#0ea5e9]">Judging (J)</span><span class="text-[var(--muted)]">vs</span><span class="font-bold text-[#84cc16]">Perceiving (P)</span></div>
+                    <p class="text-[var(--muted)]"><strong>รูปแบบชีวิต:</strong> กลุ่ม J ชอบวางแผนและระเบียบ กลุ่ม P ชอบความยืดหยุ่นและเปิดกว้าง</p>
+                </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Games Tab -->
+      <section id="tab-games" class="tab-content hidden">
+        <div class="grid gap-6">
+            <!-- Team Generator -->
+            <div class="glass-card rounded-2xl p-4 md:p-6">
+                <h3 class="text-xl font-bold mb-4">Random Team Generator</h3>
+                <p class="text-[var(--muted)] text-sm mb-4">แบ่งทีมแบบสุ่ม ๆ สำหรับกิจกรรมต่างๆ</p>
+                <div class="flex gap-4 mb-4">
+                    <div class="flex-1">
+                        <label class="text-xs text-[var(--muted)]">จำนวนทีม</label>
+                        <select id="team-count" class="w-full mt-1 p-2 rounded bg-[var(--bg-secondary)] border border-[var(--border)]">
+                            <option value="2">2 ทีม</option>
+                            <option value="3">3 ทีม</option>
+                            <option value="4">4 ทีม</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button id="generate-teams-btn" class="px-6 py-2 bg-[var(--accent)] text-white font-bold rounded-lg hover:opacity-90 transition">สุ่มทีม</button>
+                    </div>
+                </div>
+                <div id="teams-result" class="grid gap-4 md:grid-cols-2"></div>
+            </div>
+
+            <!-- Most Likely To -->
+            <div class="glass-card rounded-2xl p-4 md:p-6">
+                <h3 class="text-xl font-bold mb-4">Who is most likely to...?</h3>
+                <p class="text-[var(--muted)] text-sm mb-4">เกมทายใจว่าใครในกลุ่มมีแนวโน้มจะทำอะไรมากที่สุด (Based on MBTI Theory)</p>
+                <button id="new-question-btn" class="w-full mb-6 py-3 bg-[var(--accent-secondary)] text-white font-bold rounded-lg hover:opacity-90 transition">สุ่มคำถามใหม่</button>
+                <div id="game-question" class="text-center text-xl md:text-2xl font-bold mb-6 min-h-[80px] flex items-center justify-center p-4 border border-[var(--border)] rounded-lg bg-[var(--bg-secondary)]">กดปุ่มด้านบนเพื่อเริ่มเกม</div>
+                <div id="game-choices" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+      </section>
+
+    </div>
+    
+    <!-- Footer -->
+    <footer>
+        <p>Powered by <a href="#" target="_blank">IBIGKUNG</a> &copy; <span id="year"></span></p>
+        <p class="mt-2 text-xs opacity-75">ข้อมูลอ้างอิงจากทฤษฎี MBTI และ 16Personalities</p>
+    </footer>
+    
+  </main>
+
+  <!-- Slide-in Profile Panel -->
+  <div id="slide-panel" class="slide-panel">
+    <div class="p-6 relative">
+      <button id="close-panel" class="absolute top-4 right-4 p-2 hover:bg-[var(--border)] rounded-full transition-colors" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="mb-6">
+        <h3 id="panel-name" class="text-3xl font-bold mb-2"></h3>
+        <span id="panel-mbti" class="mbti-badge"></span>
+      </div>
+      <div id="panel-content" class="space-y-6"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============ ENHANCED DATA (Content Update) ============
+    const mbtiData = {
+      ENTJ: { 
+        type: 'ENTJ', group: 'Analyst', groupColor: '#10b981', name: 'The Commander', thaiName: 'ผู้บัญชาการ', 
+        traits: ['เป็นผู้นำ', 'มีวิสัยทัศน์', 'มุ่งมั่น', 'กล้าได้กล้าเสีย'], 
+        strengths: 'เป็นผู้นำโดยธรรมชาติ มีความมั่นใจสูง เป็นนักวางแผนระยะยาวที่เก่งกาจ ตัดสินใจเด็ดขาดและมีเป้าหมายชัดเจน', 
+        weaknesses: 'อาจดูเผด็จการหรือหยาบคาย ไม่อดทนต่อความไร้ประสิทธิภาพ อาจละเลยความรู้สึกของผู้อื่น', 
+        description: 'ผู้บัญชาการเป็นผู้นำที่มีเสน่ห์และมุ่งมั่น พวกเขาชอบที่จะนำพาคนอื่นไปสู่จุดหมายร่วมกัน และมักจะไม่ยอมแพ้ง่ายๆ',
+        dimensions: { EI: 75, SN: 70, TF: 80, JP: 85 }, 
+        functions: { dom: 'Te', aux: 'Ni', tert: 'Se', inf: 'Fi' }, 
+        loop: 'Te-Se Loop: กลายเป็นคนหุนหันพลันแล่น ตัดสินใจโดยไม่คิด', grip: 'Fi Grip: กลายเป็นคนอ่อนไหวง่าย ขี้น้อยใจ', 
+        famous: 'Steve Jobs, Margaret Thatcher', comm: 'ตรงไปตรงมา พูดถึงผลลัพธ์และเป้าหมาย อย่าพูดวกวน' 
+      },
+      ESTP: { 
+        type: 'ESTP', group: 'Explorer', groupColor: '#ec4899', name: 'The Entrepreneur', thaiName: 'นักธุรกิจ', 
+        traits: ['ชอบ action', 'แก้ปัญหาเฉพาะหน้า', 'สนุกสนาน', 'กล้าเสี่ยง'], 
+        strengths: 'แก้ปัญหาเฉพาะหน้าได้ดีเยี่ยม ปรับตัวเก่ง มีพลังและสนุกสนาน ชอบความตื่นเต้นและการลงมือทำจริง', 
+        weaknesses: 'อาจหุนหันพลันแล่น ไม่ชอบวางแผนระยะยาว อาจขาดความรับผิดชอบต่อสัญญาหรือกฎระเบียบ', 
+        description: 'นักธุรกิจเป็นคนที่ฉลาด มีพลัง และชอบการรับรู้ผ่านประสาทสัมผัส พวกเขามีความสุขกับการใช้ชีวิตอย่างเต็มที่และไม่ชอบการคาดเดา',
+        dimensions: { EI: 80, SN: 75, TF: 65, JP: 30 }, 
+        functions: { dom: 'Se', aux: 'Ti', tert: 'Fe', inf: 'Ni' }, 
+        loop: 'Se-Fe Loop: ติดอยู่กับการสร้างความประทับใจ ทำตัวเด่นเกินไป', grip: 'Ni Grip: มีความคิดลบ กลัวอนาคต', 
+        famous: 'Eddie Murphy, Jack Nicholson', comm: 'พูดสั้นๆ ไปเรื่อยๆ ชวนไปทำอะไรสนุกๆ' 
+      },
+      ENFJ: { 
+        type: 'ENFJ', group: 'Diplomat', groupColor: '#f59e0b', name: 'The Protagonist', thaiName: 'ผู้นำผู้มีอุดมการณ์', 
+        traits: ['ผู้นำที่เข้าใจผู้อื่น', 'ชอบช่วยเหลือ', 'มีเสน่ห์', 'สื่อสารเก่ง'], 
+        strengths: 'มีเสน่ห์และพูดเก่ง เข้าใจความรู้สึกผู้อื่นลึกซึ้ง มีความสามารถในการจูงใจและสร้างแรงบันดาลใจให้ผู้อื่น', 
+        weaknesses: 'อาจให้มากเกินไปจนลืมดูแลตัวเอง ไวต่อการวิจารณ์ อาจตัดสินใจโดยใช้อารมณ์มากเกินไป', 
+        description: 'ผู้นำผู้มีอุดมการณ์เป็นนักสร้างแรงบันดาลใจตามธรรมชาติ พวกเขามีความสามารถในการเข้าใจความต้องการของผู้อื่นและมักจะทำทุกอย่างเพื่อช่วยเหลือ',
+        dimensions: { EI: 70, SN: 65, TF: 25, JP: 75 }, 
+        functions: { dom: 'Fe', aux: 'Ni', tert: 'Se', inf: 'Ti' }, 
+        loop: 'Fe-Se Loop: มุ่งแต่การทำให้คนอื่นพอใจ ขาดการคิดวิเคราะห์', grip: 'Ti Grip: กลายเป็นคนเย็นชา วิจารณ์คนอื่นอย่างรุนแรง', 
+        famous: 'Barack Obama, Oprah Winfrey', comm: 'พูดถึงความรู้สึกและคุณค่า ชวนคุยเรื่องอนาคต' 
+      },
+      INTJ: { 
+        type: 'INTJ', group: 'Analyst', groupColor: '#10b981', name: 'The Architect', thaiName: 'สถาปนิก', 
+        traits: ['คิดเชิงกลยุทธ์', 'อิสระ', 'มีหลักการ', 'มองการณ์ไกล'], 
+        strengths: 'คิดวิเคราะห์ได้ดีเยี่ยม มีวิสัยทัศน์และความคิดสร้างสรรค์ สามารถเปลี่ยนความคิดให้เป็นแผนปฏิบัติได้', 
+        weaknesses: 'อาจดูเย็นชาหรือหยิ่ง ไม่ชอบงานที่ซ้ำซากหรือไร้ประสิทธิภาพ อาจเป็น perfectionist มากเกินไป', 
+        description: 'สถาปนิกเป็นนักคิดเชิงกลยุทธ์ที่มีจินตนาการและแผนการณ์ที่ทะเยอทะยาน พวกเขามีความมุ่งมั่นที่จะนำแผนนั้นไปสู่การปฏิบัติ',
+        dimensions: { EI: 25, SN: 75, TF: 85, JP: 80 }, 
+        functions: { dom: 'Ni', aux: 'Te', tert: 'Fi', inf: 'Se' }, 
+        loop: 'Ni-Fi Loop: จมอยู่กับจินตนาการส่วนตัว ตัดสินตัวเองอย่างรุนแรง', grip: 'Se Grip: กลายเป็นคนชอบสัมผัส กินเยอะ ดื่มเยอะ', 
+        famous: 'Elon Musk, Mark Zuckerberg', comm: 'พูดถึงแนวคิดและระบบ อย่าพูดเรื่องไร้สาระ' 
+      },
+      ISTP: { 
+        type: 'ISTP', group: 'Explorer', groupColor: '#ec4899', name: 'The Virtuoso', thaiName: 'ช่างเทคนิค', 
+        traits: ['แก้ปัญหาได้ดี', 'ชอบทดลอง', 'สงบ', 'เป็นนักปฏิบัติ'], 
+        strengths: 'แก้ปัญหาได้ดีและปรับตัวเก่ง มีทักษะการใช้เครื่องมือและเทคโนโลยี ทำงานภายใต้ความกดดันได้ดี', 
+        weaknesses: 'อาจดูเก็บกดหรือไม่แยแส ไม่ชอบผูกพันหรือให้คำมั่นสัญญาระยะยาว อาจขี้เบื่อ', 
+        description: 'ช่างเทคนิคเป็นนักสังเกตการณ์ที่ชาญฉลาด พวกเขามักจะเป็นผู้เชี่ยวชาญในการใช้เครื่องมือหลากหลายประเภท',
+        dimensions: { EI: 30, SN: 70, TF: 70, JP: 35 }, 
+        functions: { dom: 'Ti', aux: 'Se', tert: 'Ni', inf: 'Fe' }, 
+        loop: 'Ti-Ni Loop: คิดวิเคราะห์ซับซ้อนแต่ไม่ลงมือทำ', grip: 'Fe Grip: กลายเป็นคนอ่อนไหว กลัวการถูกปฏิเสธ', 
+        famous: 'Clint Eastwood, Tom Cruise', comm: 'พูดแบบตรงไปตรงมา ให้ข้อมูลที่เป็นประโยชน์' 
+      },
+      ISFP: { 
+        type: 'ISFP', group: 'Explorer', groupColor: '#ec4899', name: 'The Adventurer', thaiName: 'นักผจญภัย', 
+        traits: ['สร้างสรรค์', 'มีศิลปะ', 'อ่อนโยน', 'ชอบอิสระ'], 
+        strengths: 'มีความคิดสร้างสรรค์และรสนิยมดี อ่อนโยนและเข้าใจผู้อื่น ชอบความหลากหลายและประสบการณ์ใหม่ๆ', 
+        weaknesses: 'อาจขี้อายหรือเก็บตัว ไม่ชอบความขัดแย้ง อาจขาดการวางแผนระยะยาว', 
+        description: 'นักผจญภัยเป็นศิลปินตัวจริง พวกเขาชอบใช้ประสาทสัมผัสในการสร้างสรรค์สิ่งที่สวยงามและมีเสน่ห์',
+        dimensions: { EI: 25, SN: 35, TF: 20, JP: 25 }, 
+        functions: { dom: 'Fi', aux: 'Se', tert: 'Ni', inf: 'Te' }, 
+        loop: 'Fi-Ni Loop: จมอยู่กับความรู้สึกส่วนตัว', grip: 'Te Grip: กลายเป็นคนชอบสั่งการ วิจารณ์คนอื่น', 
+        famous: 'Michael Jackson, Prince', comm: 'ชวนคุยเรื่องศิลปะ ธรรมชาติ ความรู้สึก' 
+      },
+      INFP: { 
+        type: 'INFP', group: 'Diplomat', groupColor: '#f59e0b', name: 'The Mediator', thaiName: 'นักไกล่เกลี่ย', 
+        traits: ['อุดมการณ์สูง', 'สร้างสรรค์', 'เห็นอกเห็นใจ', 'มองหาความหมาย'], 
+        strengths: 'มีอุดมการณ์และความคิดสร้างสรรค์สูง มีความสามารถในการเข้าใจความรู้สึกผู้อื่นลึกซึ้ง ภักดีต่อค่านิยมของตัวเอง', 
+        weaknesses: 'อาจอ่อนไหวเกินไป ไม่ชอบความขัดแย้ง อาจขาดความเป็นจริงในการวางแผน', 
+        description: 'นักไกล่เกลี่ยเป็นคนที่มีอุดมการณ์สูงและมองหาความดีงามในทุกสิ่ง พวกเขามักจะทำงานเพื่อสิ่งที่เชื่อมั่น',
+        dimensions: { EI: 20, SN: 70, TF: 15, JP: 30 }, 
+        functions: { dom: 'Fi', aux: 'Ne', tert: 'Si', inf: 'Te' }, 
+        loop: 'Fi-Si Loop: หมกมุ่นกับอดีต ประณามตัวเอง', grip: 'Te Grip: กลายเป็นคนชอบควบคุม โจมตีคนอื่น', 
+        famous: 'William Shakespeare, J.R.R. Tolkien', comm: 'พูดจาอ่อนโยน ให้เวลาเขาคิด พูดถึงคุณค่า' 
+      },
+      INFJ: { 
+        type: 'INFJ', group: 'Diplomat', groupColor: '#f59e0b', name: 'The Advocate', thaiName: 'ผู้สนับสนุน', 
+        traits: ['หายากที่สุด', 'เข้าใจผู้อื่นลึกซึ้ง', 'มีอุดมการณ์', 'มีวิสัยทัศน์'], 
+        strengths: 'เข้าใจผู้อื่นลึกซึ้งและมีอุดมการณ์ มีวิสัยทัศน์และความสามารถในการวางแผนระยะยาว ซื่อสัตย์และทุ่มเท', 
+        weaknesses: 'อาจให้มากเกินไปจนหมดไฟ ไวต่อการวิจารณ์ อาจดูลึกลับหรือจู้จี้', 
+        description: 'ผู้สนับสนุนเป็นคนที่มีความคิดสร้างสรรค์และมีความลึกซึ้ง พวกเขาไม่ใช่แค่ฝัน แต่ยังลงมือทำเพื่อเปลี่ยนแปลงโลก',
+        dimensions: { EI: 15, SN: 75, TF: 20, JP: 70 }, 
+        functions: { dom: 'Ni', aux: 'Fe', tert: 'Ti', inf: 'Se' }, 
+        loop: 'Ni-Ti Loop: คิดวิเคราะห์อย่างเดียว แยกตัวจากสังคม', grip: 'Se Grip: ทำตัวสุดโต่ง กินเยอะ ใช้เงินเยอะ', 
+        famous: 'Martin Luther King, Mother Teresa', comm: 'คุยเชิงลึก พูดถึงความหมาย อนาคต มนุษยธรรม' 
+      },
+      ISTJ: { 
+        type: 'ISTJ', group: 'Sentinel', groupColor: '#3b82f6', name: 'The Logistician', thaiName: 'นักโลจิสติกส์', 
+        traits: ['มีหลักการ', 'รับผิดชอบ', 'ละเอียดรอบคอบ', 'ไว้ใจได้'], 
+        strengths: 'ไว้ใจได้และรับผิดชอบสูง ละเอียดรอบคอบและถูกต้อง ยึดมั่นในกฎระเบียบและข้อตกลง', 
+        weaknesses: 'อาจดูแข็งกร้าวหรือดื้อรั้น ไม่ชอบการเปลี่ยนแปลงฉับพลัน อาจตัดสินคนอื่นเร็วเกินไป', 
+        description: 'นักโลจิสติกส์เป็นคนที่เชื่อถือได้และมีหลักการ พวกเขาให้ความสำคัญกับความถูกต้องและความเป็นระเบียบ',
+        dimensions: { EI: 20, SN: 65, TF: 75, JP: 85 }, 
+        functions: { dom: 'Si', aux: 'Te', tert: 'Fi', inf: 'Ne' }, 
+        loop: 'Si-Fi Loop: ยึดติดกับอดีตที่ไม่ดี รู้สึกผิด', grip: 'Ne Grip: กังวลกับทุกสิ่งรอบตัว จินตนาการถึงภัยพิบัติ', 
+        famous: 'Warren Buffett, Jeff Bezos', comm: 'ให้ข้อมูลชัดเจน ตรงเวลา ยึดตามกฎระเบียบ' 
+      },
+      ESFP: { 
+        type: 'ESFP', group: 'Explorer', groupColor: '#ec4899', name: 'The Entertainer', thaiName: 'นักแสดง', 
+        traits: ['สนุกสนาน', 'ร่าเริง', 'ชอบแสดงออก', 'เป็นมิตร'], 
+        strengths: 'สนุกสนานและร่าเริง เป็นมิตรกับทุกคน มีทักษะในการสังเกตและตอบสนองต่อสิ่งแวดล้อม', 
+        weaknesses: 'อาจขาดสมาธิ ไม่ชอบวางแผนหรือการวิเคราะห์เชิงลึก อาจหลีกเลี่ยงความขัดแย้ง', 
+        description: 'นักแสดงเป็นคนที่ชอบความสนุกและสดใส พวกเขามักจะเป็นศูนย์กลางของความสนใจและชอบทำให้คนอื่นมีความสุข',
+        dimensions: { EI: 85, SN: 30, TF: 25, JP: 20 }, 
+        functions: { dom: 'Se', aux: 'Fi', tert: 'Te', inf: 'Ni' }, 
+        loop: 'Se-Te Loop: ชอบสั่งการคนอื่นเพื่อความสนุก', grip: 'Ni Grip: กังวลกับอนาคต มีความคิดลบซ้ำซาก', 
+        famous: 'Marilyn Monroe, Will Smith', comm: 'สนุกสนาน มีชีวิตชีวา ชวนไปเที่ยว' 
+      }
+    };
+
+    const people = [
+      { name: 'Siri', mbti: 'ENTJ' }, { name: 'JJoy', mbti: 'ESTP' }, { name: 'P\'Mick', mbti: 'ESTP' },
+      { name: 'Chichi', mbti: 'ENFJ' }, { name: 'Big', mbti: 'INTJ' }, { name: 'P\'Non', mbti: 'INTJ' },
+      { name: 'P\'Chok', mbti: 'ISTP' }, { name: 'P\'Mon', mbti: 'ISTP' }, { name: 'Nano', mbti: 'ISTP' },
+      { name: 'Nep', mbti: 'ISFP' }, { name: 'P\'Kwang', mbti: 'INFP' }, { name: 'First', mbti: 'INFP' },
+      { name: 'Eve', mbti: 'INFP' }, { name: 'Raccoon', mbti: 'INFP' }, { name: 'Ploy', mbti: 'INFJ' },
+      { name: 'P\'Gum', mbti: 'ISTJ' }, { name: 'Tamuay', mbti: 'ISTJ' }, { name: 'Snow', mbti: 'ESFP' },
+      { name: 'Yookyik', mbti: 'ESFP' }
+    ];
+
+    // ============ CORE LOGIC ============
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    function createParticle() { return { x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, radius: Math.max(1, Math.random() * 2), opacity: Math.random() * 0.5 + 0.1 }; }
+    function initParticles() { particles = []; const count = Math.min(80, Math.floor(window.innerWidth / 20)); for (let i = 0; i < count; i++) particles.push(createParticle()); }
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); const pColor = '16, 185, 129';
+      particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > canvas.width) p.vx *= -1; if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = `rgba(${pColor}, ${p.opacity})`; ctx.fill();
+        particles.slice(i + 1).forEach(p2 => { const dist = Math.sqrt((p.x - p2.x) ** 2 + (p.y - p2.y) ** 2); if (dist < 120) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.strokeStyle = `rgba(${pColor}, ${0.1 * (1 - dist / 120)})`; ctx.stroke(); } });
+      }); requestAnimationFrame(animateParticles);
+    }
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      document.body.classList.toggle('light-theme');
+      localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+      if (!document.getElementById('tab-radar').classList.contains('hidden')) drawRadarChart();
+    });
+    if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-theme');
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
+        tabContents.forEach(c => { c.classList.add('hidden'); if (c.id === `tab-${btn.dataset.tab}`) c.classList.remove('hidden'); });
+        if (btn.dataset.tab === 'radar') setTimeout(drawRadarChart, 100);
+        if (btn.dataset.tab === 'dynamics') updateGroupDynamics();
+      });
+    });
+
+    // ============ SLIDE PANEL ============
+    const slidePanel = document.getElementById('slide-panel');
+    const panelOverlay = document.getElementById('panel-overlay');
+    
+    function openPanel(name, mbti) {
+      const data = mbtiData[mbti];
+      document.getElementById('panel-name').textContent = name;
+      const mbtiSpan = document.getElementById('panel-mbti');
+      mbtiSpan.textContent = `${mbti} - ${data.thaiName}`;
+      mbtiSpan.style.background = `${data.groupColor}20`; mbtiSpan.style.color = data.groupColor;
+
+      const funcs = data.functions;
+      
+      document.getElementById('panel-content').innerHTML = `
+        <div class="flex flex-wrap gap-2">${data.traits.map(t => `<span class="px-2 py-1 rounded-full text-xs bg-[var(--border)]">${t}</span>`).join('')}</div>
+        
+        <!-- New Description Field -->
+        <div class="bg-[var(--bg-secondary)] rounded-lg p-4 border-l-4 border-[var(--accent)]">
+             <h4 class="font-bold mb-2 text-[var(--accent)]">รายละเอียดบุคลิก</h4>
+             <p class="text-sm text-[var(--muted)]">${data.description}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-[var(--bg-secondary)] rounded-lg p-3"><h5 class="text-xs text-[var(--accent)] font-semibold mb-1">จุดแข็ง</h5><p class="text-sm text-[var(--muted)]">${data.strengths}</p></div>
+          <div class="bg-[var(--bg-secondary)] rounded-lg p-3"><h5 class="text-xs text-[var(--warning)] font-semibold mb-1">จุดที่ควรพัฒนา</h5><p class="text-sm text-[var(--muted)]">${data.weaknesses}</p></div>
+        </div>
+        <div><h4 class="font-bold mb-3">Cognitive Functions</h4><div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="function-card" style="border-color: var(--accent)"><div class="font-bold text-[var(--accent)]">Dominant</div><div class="text-lg font-bold my-1">${funcs.dom}</div></div>
+            <div class="function-card" style="border-color: var(--accent-secondary)"><div class="font-bold text-[var(--accent-secondary)]">Auxiliary</div><div class="text-lg font-bold my-1">${funcs.aux}</div></div>
+            <div class="function-card" style="border-color: var(--muted)"><div class="font-bold text-[var(--muted)]">Tertiary</div><div class="text-lg font-bold my-1">${funcs.tert}</div></div>
+            <div class="function-card" style="border-color: var(--danger)"><div class="font-bold text-[var(--danger)]">Inferior</div><div class="text-lg font-bold my-1">${funcs.inf}</div></div>
+        </div></div>
+        <div><h4 class="font-bold mb-2 text-[var(--danger)]">สภาวะวิกฤต (Stress)</h4><div class="bg-[var(--bg-secondary)] rounded-lg p-3 mb-2"><div class="text-xs font-bold text-[var(--danger)] mb-1">Loop (วนซ้ำ)</div><p class="text-xs text-[var(--muted)]">${data.loop}</p></div><div class="bg-[var(--bg-secondary)] rounded-lg p-3"><div class="text-xs font-bold text-[var(--danger)] mb-1">Grip (ควบคุมไม่ได้)</div><p class="text-xs text-[var(--muted)]">${data.grip}</p></div></div>
+        <div class="bg-[var(--accent)]10 border border-[var(--accent)]30 rounded-lg p-4"><h4 class="font-bold mb-2 text-[var(--accent)]">คนดังที่ใกล้เคียง</h4><p class="text-sm">${data.famous}</p></div>
+        <div><h4 class="font-bold mb-2">Tips: คุยกับ ${name} ยังไง?</h4><p class="text-sm text-[var(--muted)]">${data.comm}</p></div>`;
+      slidePanel.classList.add('open');
+      panelOverlay.classList.add('open');
+    }
+
+    function closePanel() { slidePanel.classList.remove('open'); panelOverlay.classList.remove('open'); }
+    document.getElementById('close-panel').addEventListener('click', closePanel);
+    panelOverlay.addEventListener('click', closePanel);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+
+    // ============ RENDER FUNCTIONS ============
+    function renderTable() {
+      const tbody = document.getElementById('mbti-table-body'); tbody.innerHTML = '';
+      people.forEach((p, idx) => {
+        const d = mbtiData[p.mbti];
+        const row = document.createElement('tr');
+        row.className = 'border-b border-[var(--border)] hover:bg-[var(--bg-secondary)] cursor-pointer transition-colors fade-in';
+        row.style.animationDelay = `${idx * 0.03}s`;
+        row.onclick = () => openPanel(p.name, p.mbti);
+        row.innerHTML = `<td class="px-4 py-3"><span class="mbti-badge" style="background: ${d.groupColor}20; color: ${d.groupColor}">${p.mbti}</span></td>
+          <td class="px-4 py-3 font-semibold">${p.name}</td><td class="px-4 py-3 text-[var(--muted)]">${d.thaiName}</td>
+          <td class="px-4 py-3 text-center text-xs text-[var(--muted)]">${d.famous.split(',')[0]}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    function updateGroupDynamics() {
+      let counts = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
+      people.forEach(p => { const m = p.mbti; counts[m[0]]++; counts[m[1]]++; counts[m[2]]++; counts[m[3]]++; });
+      const total = people.length;
+      const setBar = (id, count) => { const pct = Math.round((count / total) * 100); document.getElementById(id).style.width = `${pct}%`; document.getElementById(id).textContent = `${pct}%`; };
+      setBar('dyn-e', counts.E); setBar('dyn-i', counts.I);
+      setBar('dyn-s', counts.S); setBar('dyn-n', counts.N);
+      setBar('dyn-t', counts.T); setBar('dyn-f', counts.F);
+      setBar('dyn-j', counts.J); setBar('dyn-p', counts.P);
+      let summary = [];
+      if(counts.N > counts.S) summary.push("กลุ่มนี้มีคนมองการณ์ไกล (N) เยอะ"); else if (counts.S > counts.N) summary.push("กลุ่มนี้มีคนช่างสังเกต (S) เยอะ");
+      if(counts.F > counts.T) summary.push("ตัดสินใจด้วยความรู้สึก (F) เยอะ"); else if (counts.T > counts.F) summary.push("ตัดสินใจด้วยเหตุผล (T) เยอะ");
+      document.getElementById('group-summary').textContent = summary.join(" ");
+    }
+
+    // ============ RADAR CHART ============
+    let selectedPeople = [];
+    function renderPersonSelector() {
+      const sel = document.getElementById('person-selector'); sel.innerHTML = '';
+      people.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1.5 rounded-full text-sm font-medium transition-all border-2';
+        const isSelected = selectedPeople.some(sp => sp.name === p.name);
+        const d = mbtiData[p.mbti];
+        if (isSelected) { btn.style.background = d.groupColor; btn.style.borderColor = d.groupColor; btn.style.color = 'white'; }
+        else { btn.style.background = 'transparent'; btn.style.borderColor = 'var(--border)'; btn.style.color = 'var(--fg)'; }
+        btn.textContent = `${p.name} (${p.mbti})`;
+        btn.onclick = () => {
+          const idx = selectedPeople.findIndex(sp => sp.name === p.name);
+          if (idx >= 0) selectedPeople.splice(idx, 1); else if (selectedPeople.length < 3) selectedPeople.push(p);
+          renderPersonSelector(); drawRadarChart(); renderDimensionBars();
+        };
+        sel.appendChild(btn);
+      });
+    }
+
+    function drawRadarChart() {
+      const c = document.getElementById('radar-canvas'); const rctx = c.getContext('2d');
+      const cx = 200, cy = 200, maxR = 140;
+      rctx.clearRect(0, 0, 400, 400);
+      const isLight = document.body.classList.contains('light-theme');
+      const gridColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+      const textColor = isLight ? '#334155' : '#94a3b8';
+      const dims = ['E/I', 'S/N', 'T/F', 'J/P'];
+      const angles = [-Math.PI/2, 0, Math.PI/2, Math.PI];
+      for (let r = 0.25; r <= 1; r += 0.25) { rctx.beginPath(); rctx.arc(cx, cy, maxR * r, 0, Math.PI * 2); rctx.strokeStyle = gridColor; rctx.stroke(); }
+      angles.forEach((a, i) => {
+        rctx.beginPath(); rctx.moveTo(cx, cy); rctx.lineTo(cx + Math.cos(a) * maxR, cy + Math.sin(a) * maxR); rctx.strokeStyle = gridColor; rctx.stroke();
+        rctx.font = 'bold 14px Noto Sans Thai'; rctx.fillStyle = textColor; rctx.textAlign = 'center'; rctx.textBaseline = 'middle';
+        rctx.fillText(dims[i], cx + Math.cos(a) * (maxR + 30), cy + Math.sin(a) * (maxR + 30));
+      });
+      selectedPeople.forEach(sp => {
+        const d = mbtiData[sp.mbti];
+        const vals = [d.dimensions.EI, d.dimensions.SN, d.dimensions.TF, d.dimensions.JP];
+        rctx.beginPath();
+        vals.forEach((v, i) => { const px = cx + Math.cos(angles[i]) * maxR * (v / 100), py = cy + Math.sin(angles[i]) * maxR * (v / 100); if (i === 0) rctx.moveTo(px, py); else rctx.lineTo(px, py); });
+        rctx.closePath(); rctx.fillStyle = `${d.groupColor}33`; rctx.fill(); rctx.strokeStyle = d.groupColor; rctx.lineWidth = 2; rctx.stroke();
+        vals.forEach((v, i) => { const px = cx + Math.cos(angles[i]) * maxR * (v / 100), py = cy + Math.sin(angles[i]) * maxR * (v / 100); rctx.beginPath(); rctx.arc(px, py, 5, 0, Math.PI * 2); rctx.fillStyle = d.groupColor; rctx.fill(); rctx.strokeStyle = 'white'; rctx.lineWidth = 2; rctx.stroke(); });
+      });
+    }
+
+    function renderDimensionBars() {
+      const container = document.getElementById('dimension-bars');
+      const dims = [{ k: 'EI', l: 'E - I' }, { k: 'SN', l: 'S - N' }, { k: 'TF', l: 'T - F' }, { k: 'JP', l: 'J - P' }];
+      container.innerHTML = dims.map(d => `<div><div class="text-sm mb-1">${d.l}</div><div class="progress-bar">${selectedPeople.map(sp => `<div class="progress-fill" style="width: ${mbtiData[sp.mbti].dimensions[d.k]}%; background: ${mbtiData[sp.mbti].groupColor}; opacity: 0.7;"></div>`).join('')}</div></div>`).join('');
+    }
+
+    // ============ COMPATIBILITY LOGIC ============
+    function initCompatibility() {
+      const sel1 = document.getElementById('compat-select-1');
+      const sel2 = document.getElementById('compat-select-2');
+      people.forEach(p => { sel1.add(new Option(`${p.name} (${p.mbti})`, p.name)); sel2.add(new Option(`${p.name} (${p.mbti})`, p.name)); });
+      
+      const calc = () => {
+        const v1 = sel1.value, v2 = sel2.value;
+        if (!v1 || !v2 || v1 === v2) { document.getElementById('compat-result').classList.add('hidden'); document.getElementById('compat-placeholder').classList.remove('hidden'); return; }
+        
+        const p1 = people.find(p => p.name === v1); const p2 = people.find(p => p.name === v2);
+        const t1 = p1.mbti; const t2 = p2.mbti;
+        
+        let diffCount = 0; for(let i=0; i<4; i++) if (t1[i] !== t2[i]) diffCount++;
+        let relation = { score: 50, title: "Unknown", pros: "-", cons: "-", advice: "-" };
+
+        if (diffCount === 0) relation = { score: 85, title: "The Mirror (สะท้อนตัวตน)", pros: "เข้าใจกันดีเยี่ยงแฝด มีมุมมองและค่านิยมเหมือนกันแทบทุกประการ สื่อสารได้โดยไม่ต้องอธิบายมาก", cons: "อาจเสริมจุดอ่อนซึ่งกันและกัน ทำให้ขาดความสมดุลในทีม และอาจเบื่อหน่ายเพราะคาดเดาพฤติกรรมกันได้ง่าย", advice: "ควรมีคนนอกวงมาช่วยตรวจสอบมุมมองเพิ่มเติม และพยายามทำกิจกรรมใหม่ๆ ร่วมกันบ้าง" };
+        else if (diffCount === 1) relation = { score: 78, title: "The Kindred (เพื่อนร่วมทาง)", pros: "มีพื้นฐานคิดคล้ายกันมาก การสื่อสารง่าย เข้าใจภาษาประสาทเดียวกัน", cons: "อาจมีความคาดหวังที่สูงเกินไปในด้านที่ต่างกัน (เช่น J กับ P) ทำให้เกิดผิดหวังง่าย", advice: "ยอมรับความแตกต่างในตำแหน่งนั้นๆ ว่าเป็นจุดเสริมกัน เช่น J ช่วยวางแผน P ช่วยปรับตัว" };
+        else if (diffCount === 3) relation = { score: 92, title: "The Complement (คู่แท้/Golden Pair)", pros: "เติมเต็มซึ่งกันและกันได้ดีที่สุด จุดแข็งของอีกฝ่ายเป็นจุดอ่อนของอีกฝ่ายพอดี ดึงดูดและน่าสนใจซึ่งกันและกัน", cons: "อาจเกิดความเข้าใจผิดในช่วงแรกเพราะมองโลกต่างมุม ต้องปรับตัวกันพอสมควร", advice: "อดทนต่อความแตกต่างในช่วงแรก พยายามเรียนรู้วิธีคิดของอีกฝ่าย จะพบว่าเป็นทีมที่เก่งที่สุด" };
+        else if (diffCount === 4) relation = { score: 58, title: "The Opposite (เสริมสร้างบทเรียน)", pros: "ได้เรียนรู้สิ่งใหม่ที่ไม่เคยรู้มาก่อน เห็นมุมมองที่หลากหลาย ทำให้ชีวิตมีสีสัน", cons: "สื่อสารยากมาก อาจทะเลาะบ่อยเพราะเห็นต่างกันในทุกเรื่อง ต้องใช้ความอดทนสูง", advice: "อย่าพยายามเปลี่ยนแปลงอีกฝ่าย มองหาเป้าหมายร่วมกันที่ชัดเจน และแบ่งหน้าที่ตามความถนัด" };
+        else relation = { score: 70, title: "The Contrast (ต่างแต่ลงตัว)", pros: "สมดุลกันดี มีทั้งความเหมือนและต่าง ช่วยสนับสนุนกันได้ดี", cons: "อาจเกิดปัญหาเรื่องการตัดสินใจ (ถ้าต่างที่ T/F) หรือการรับข้อมูล (ถ้าต่างที่ S/N)", advice: "ใช้จุดเหมือนเป็นฐานและใช้จุดต่างเป็นเครื่องมือเสริม" };
+
+        document.getElementById('compat-placeholder').classList.add('hidden');
+        document.getElementById('compat-result').classList.remove('hidden');
+        document.getElementById('compat-type').textContent = relation.title;
+        document.getElementById('compat-score').textContent = `${relation.score}%`;
+        document.getElementById('compat-pros').textContent = relation.pros;
+        document.getElementById('compat-cons').textContent = relation.cons;
+        document.getElementById('compat-advice').textContent = relation.advice;
+      };
+      sel1.onchange = calc; sel2.onchange = calc;
+    }
+
+    // ============ GAMES LOGIC ============
+    // 1. Team Generator
+    const teamGeneratorBtn = document.getElementById('generate-teams-btn');
+    const teamsResultDiv = document.getElementById('teams-result');
+
+    teamGeneratorBtn.addEventListener('click', () => {
+        const teamCount = parseInt(document.getElementById('team-count').value);
+        const shuffled = [...people].sort(() => 0.5 - Math.random());
+        const teams = Array.from({ length: teamCount }, () => []);
+        shuffled.forEach((p, i) => teams[i % teamCount].push(p));
+        
+        teamsResultDiv.innerHTML = teams.map((team, i) => `
+            <div class="team-box rounded-xl p-4 fade-in">
+                <h4 class="font-bold text-lg mb-3 text-[var(--accent)]">ทีม ${i + 1}</h4>
+                <ul class="space-y-2">
+                    ${team.map(p => {
+                        const d = mbtiData[p.mbti];
+                        return `<li class="flex items-center gap-2 text-sm">
+                            <span class="w-2 h-2 rounded-full" style="background: ${d.groupColor}"></span>
+                            <span>${p.name}</span>
+                            <span class="text-[var(--muted)] text-xs">(${p.mbti})</span>
+                        </li>`;
+                    }).join('')}
+                </ul>
+            </div>
+        `).join('');
+    });
+
+    // 2. Most Likely To
+    const questions = [
+        { q: "ใครน่าจะกลายเป็นเศรษฐีได้เร็วที่สุด?", types: ['ENTJ', 'INTJ', 'ESTJ'] },
+        { q: "ใครน่าจะร้องไห้ดูหนังซักทีแล้วทำตัวเหมือนไม่มีอะไรเกิดขึ้น?", types: ['INTJ', 'ISTP', 'ENTP'] },
+        { q: "ใครน่าจะหลงทางแม้ว่าจะมี GPS อยู่ในมือ?", types: ['INTJ', 'INFP', 'INFJ'] },
+        { q: "ใครน่าจะเป็นคนเริ่มพูดคุยกับคนแปลกหน้าได้ก่อน?", types: ['ENFJ', 'ESFP', 'ENTP'] },
+        { q: "ใครน่าจะวางแผนละเอียดสำหรับการไปเที่ยว 1 วัน?", types: ['ISTJ', 'ENTJ', 'INFJ'] },
+        { q: "ใครน่าจะลืมของบ่อยที่สุด?", types: ['ENFP', 'ESFP', 'INFP'] },
+        { q: "ใครน่าจะเถียงจนกว่าจะชนะ?", types: ['ENTJ', 'INTJ', 'ESTP'] },
+        { q: "ใครน่าจะใจดีที่สุดในกลุ่ม?", types: ['ISFJ', 'INFJ', 'ENFJ'] },
+        { q: "ใครน่าจะอยู่ในห้องนานๆ โดยไม่ออกไปไหนเป็นอาทิตย์?", types: ['INTP', 'INTJ', 'INFP'] },
+        { q: "ใครน่าจะเป็นพระเอก/นางเอกในหนังชีวิตจริง?", types: ['ESFP', 'ENFJ', 'ISFP'] }
+    ];
+
+    const gameQuestionDiv = document.getElementById('game-question');
+    const gameChoicesDiv = document.getElementById('game-choices');
+    const newQuestionBtn = document.getElementById('new-question-btn');
+
+    newQuestionBtn.addEventListener('click', () => {
+        gameChoicesDiv.innerHTML = '';
+        const randomQ = questions[Math.floor(Math.random() * questions.length)];
+        gameQuestionDiv.innerHTML = `<div class="fade-in"><span class="text-[var(--accent)]">สถานการณ์:</span><br>${randomQ.q}</div>`;
+        
+        let candidates = people.filter(p => randomQ.types.includes(p.mbti));
+        while(candidates.length < 3) {
+            const randomPerson = people[Math.floor(Math.random() * people.length)];
+            if(!candidates.find(c => c.name === randomPerson.name)) candidates.push(randomPerson);
+        }
+        candidates = candidates.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        setTimeout(() => {
+            gameChoicesDiv.innerHTML = candidates.map(c => {
+                const d = mbtiData[c.mbti];
+                return `<button class="game-choice-btn p-4 rounded-xl text-center fade-in" onclick="alert('ตอบถูก! ${c.name} (${c.mbti}) มีลักษณะเข้าข่ายครับ!')">
+                    <div class="text-2xl font-bold">${c.name}</div>
+                    <div class="text-xs text-[var(--muted)] mt-1">${c.mbti} - ${d.thaiName}</div>
+                </button>`;
+            }).join('');
+        }, 300);
+    });
+
+    // ============ INIT ============
+    function init() {
+      resizeCanvas(); initParticles();
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) animateParticles();
+      renderTable(); renderPersonSelector(); drawRadarChart(); renderDimensionBars(); initCompatibility();
+      document.getElementById('year').textContent = new Date().getFullYear();
+    }
+    
+    window.onresize = () => { resizeCanvas(); initParticles(); };
+    init();
+  </script>
+</body>
+</html>
